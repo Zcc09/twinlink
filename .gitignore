@@ -1,0 +1,17 @@
+# build outputs
+relay/dist/
+app/build/
+build/
+.gradle/
+local.properties
+*.exe
+*.apk
+*.aab
+*.keystore
+*.p12
+
+# editor / os
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

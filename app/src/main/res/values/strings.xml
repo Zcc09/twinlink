@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_label">Twinlink</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting</string>
+    <string name="status_connected">Connected</string>
+
+    <string name="section_relay">Relay</string>
+    <string name="hint_host">Host or IP</string>
+    <string name="hint_port">Port</string>
+    <string name="hint_secret">Shared secret (16+ characters)</string>
+    <string name="label_host">Relay host</string>
+    <string name="label_port">UDP port</string>
+    <string name="label_secret">Secret</string>
+    <string name="action_apply">Save relay settings</string>
+    <string name="saved">Saved</string>
+
+    <string name="section_links">Links</string>
+    <string name="section_tunnel">Tunnel</string>
+    <string name="toggle_connect">Connect</string>
+    <string name="no_links">No usable link yet. Join Wi-Fi or turn on mobile data.</string>
+    <string name="throughput_total">Total</string>
+    <string name="footnote">Twinlink v1 bonds links but does not encrypt payloads. Use it only over a relay you control.</string>
+    <string name="note_consent_denied">Error: VPN permission denied</string>
+    <string name="error_secret_short">Error: secret must be at least 16 characters</string>
+    <string name="error_host_empty">Error: relay host is empty</string>
+    <string name="notification_channel">tunnel</string>
+    <string name="notification_title">Twinlink tunnel</string>
+    <string name="notification_text">Bonding links to the relay</string>
+    <string name="notification_stop">Disconnect</string>
+    <string name="rtt_format">RTT %1$s</string>
+    <string name="link_detail">%1$s · %2$s</string>
+    <string name="connect_subtitle">Bond every available link</string>
+    <string name="session_line">session %1$s · MTU %2$d · %3$d link(s)</string>
+    <string name="rate_pair">↓ %1$s      ↑ %2$s</string>
+    <string name="rate_pair_compact">%1$s · %2$s</string>
+    <string name="unknown">—</string>
+    <string name="version_line">v%1$s</string>
+    <string name="status_error">Error: %1$s</string>
+    <string name="waiting_relay">Waiting for the relay</string>
+    <string name="tunnel_off">Tunnel is off</string>
+    <string name="pending_line">%1$d held · %2$d malformed</string>
+</resources>

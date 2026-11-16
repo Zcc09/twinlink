@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="surface">#0B1220</color>
+    <color name="card">#131C2E</color>
+    <color name="card_raised">#182339</color>
+    <color name="accent">#1D6BF3</color>
+    <color name="teal">#14C8C8</color>
+    <color name="text">#E8EEF9</color>
+    <color name="muted">#8FA3BF</color>
+    <color name="line">#223252</color>
+    <color name="warn">#E2603F</color>
+    <color name="ok">#14C8C8</color>
+</resources>

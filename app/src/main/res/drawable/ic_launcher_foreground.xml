@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Left arrow, blue: one link of the bond. -->
+    <path
+        android:pathData="M34,33 L52,54 L34,75"
+        android:strokeColor="#1D6BF3"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Right arrow, teal: the other link. -->
+    <path
+        android:pathData="M74,33 L56,54 L74,75"
+        android:strokeColor="#14C8C8"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- White capsule where the two arrows merge. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,49 L62,49 A5,5 0 0 1 67,54 A5,5 0 0 1 62,59 L46,59 A5,5 0 0 1 41,54 A5,5 0 0 1 46,49 Z" />
+</vector>
