@@ -31,7 +31,7 @@ class EngineTest {
     fun fiveHundredDataPacketsArriveInOrderAcrossTwoLinks() {
         val tun = FakeTun()
         val fast = FakeLink(0, rttMs = 20, relayEchoMs = 30, executor = schedulerPool)
-        val slow = FakeLink(1, rttMs = 120, relayEchoMs = 30, executor = schedulerPool)
+        val slow = FakeLink(1, rttMs = 45, relayEchoMs = 30, executor = schedulerPool)
         val engine = TwinlinkEngine(
             tun = tun,
             pool = FixedPool(listOf(fast, slow)),

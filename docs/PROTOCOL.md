@@ -122,6 +122,12 @@ This splits traffic proportionally to measured capacity and converges to the fas
 For a single stream the weight convergence is the whole point: both links carry DATA packets of the
 same flow, which is what makes the phone's single TCP download faster than either link alone.
 
+**RTT spread limit.** A hole is only waited for `HOLD_MS` (40 ms), so a link whose packets land more
+than ~40 ms after the fastest link's will have them skipped as losses — its bandwidth is spent and
+thrown away, and the flow sees a spurious retransmit. Bond links whose RTT differs by less than
+about 30 ms (the normal case for Wi-Fi + LTE/5G on the same site). A relay far from the phone adds
+the same latency to both links, which is harmless; it is the *difference* between links that hurts.
+
 ## 6. Reordering (receiver)
 
 `DATA` packets arrive out of order by design. The receiver must restore order before writing to the TUN:

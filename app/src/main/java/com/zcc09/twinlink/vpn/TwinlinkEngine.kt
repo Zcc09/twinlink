@@ -63,9 +63,14 @@ class TwinlinkEngine(
         txSeq.set(0)
         synchronized(reorder) { reorder.reset(0) }
         refreshLinks()
-        // Handshake first so the relay has registered every source address before DATA arrives.
-        sendHelloAll()
-        sendPingAll()
+        // Handshake first so the relay has registered every source address before DATA
+        // arrives - but on its own thread: these are socket writes, and on Android the
+        // caller is the service's main thread where any network I/O throws
+        // NetworkOnMainThreadException.
+        spawn("tl-handshake") {
+            sendHelloAll()
+            sendPingAll()
+        }
         readerThread = spawn("tl-tun-reader") { readerLoop() }
         controlThread = spawn("tl-control") { controlLoop() }
     }
@@ -180,8 +185,14 @@ class TwinlinkEngine(
                     return
                 }
                 val payload = buf.copyOfRange(at, n)
-                val ready = synchronized(reorder) { reorder.onData(header.seq, payload, now) }
-                writeReady(ready)
+                // The reorder decision and the TUN write must be one atomic step:
+                // with one lock per operation, two link threads can each be handed
+                // "the next packet in order" and then write them in the opposite
+                // order, which is exactly the reordering this buffer exists to remove.
+                synchronized(writeLock) {
+                    val ready = synchronized(reorder) { reorder.onData(header.seq, payload, now) }
+                    writeReady(ready)
+                }
                 stats.setPending(pendingCount)
             }
 
@@ -252,8 +263,10 @@ class TwinlinkEngine(
                 lastPing = now
                 sendPingAll()
             }
-            val ready = synchronized(reorder) { reorder.tick(now) }
-            writeReady(ready)
+            synchronized(writeLock) {
+                val ready = synchronized(reorder) { reorder.tick(now) }
+                writeReady(ready)
+            }
             stats.setPending(pendingCount)
             sleepQuiet(tickMs)
         }

@@ -230,14 +230,21 @@ class TwinlinkVpnService : VpnService() {
     }
 
     private fun startInForeground() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                buildNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+        } catch (t: Throwable) {
+            // A platform that refuses the foreground promotion must not take the
+            // whole process down with it: report it and close the tunnel cleanly.
+            TunnelBus.postError("Foreground service refused: " + (t.message ?: t.javaClass.simpleName))
+            stopTunnel()
         }
     }
 

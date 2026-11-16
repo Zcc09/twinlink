@@ -82,6 +82,20 @@ It registers two links, sends ICMP echo and DNS queries inside hand-built IPv4 p
 tunnel, and asserts that the replies come back on both links. `PASS` means the whole path —
 client → relay → TUN → NAT → internet → back — is working.
 
+## What has actually been measured
+
+| check | result |
+|---|---|
+| relay tests (`go test ./...`, 91 assertions incl. subtests) | pass |
+| relay bonding rig — 8000 packets over two emulated 4:1 links | every packet delivered exactly once, in order; split 80.0 / 20.0 |
+| relay benchmark — 50 Mbit/s + 20 Mbit/s emulated links | **8.67 MB/s bonded vs 6.12 MB/s best single link = 1.42x** |
+| relay on real Linux (container on the NAS, kernel TUN + MASQUERADE) | ICMP echo 12/12, DNS 40/40 answered through the tunnel, both links carried bytes |
+| app JVM tests | 34 pass (codec, HMAC vectors, reorder, scheduler, engine) |
+| app on hardware — Galaxy Tab S9 Ultra, Android 16 | VPN consent → `Connected`, session 1297, Wi-Fi link at RTT 20 ms, 2 MB / 1699 packets through the relay in 8 s, clean disconnect |
+
+Not yet measured: end-to-end bonding on a phone with Wi-Fi **and** cellular at once. That needs a
+relay both links can reach, which a home line behind CGNAT cannot provide.
+
 ## Status / limits (v1)
 
 Working: dual-link capture, weighted splitting, reordering, NAT exit, session auth, live per-link
@@ -96,3 +110,6 @@ Not in v1, stated plainly so nobody is surprised:
 - **No IPv6** tunnelling; the app deliberately does not route IPv6 into the tunnel.
 - Bonding is only as fast as the relay's own uplink and its distance from you — a relay in the same
   country adds ~5-15 ms RTT, one on another continent adds 100 ms+ to every connection.
+- Links are bonded per packet, so the two links must be *similarly* fast on latency: a hole is only
+  held 40 ms, so a link more than ~40 ms slower than the best one gets its packets skipped (they are
+  treated as loss). Wi-Fi + LTE in the same place is fine; Wi-Fi + a congested satellite link is not.

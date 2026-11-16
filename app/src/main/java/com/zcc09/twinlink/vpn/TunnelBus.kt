@@ -16,6 +16,12 @@ object TunnelBus {
     @Volatile
     var lastError: String? = null
 
+    /** Record a failure the user must see in the UI, and mark the tunnel as down. */
+    fun postError(message: String) {
+        lastError = message
+        serviceRunning = false
+    }
+
     fun snapshot(): TwinlinkStats.Snapshot {
         val current = stats
         if (current == null || !serviceRunning) {

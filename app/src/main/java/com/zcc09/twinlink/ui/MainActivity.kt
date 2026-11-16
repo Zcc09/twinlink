@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -84,6 +85,19 @@ class MainActivity : AppCompatActivity() {
         linkList = findViewById(R.id.link_list)
         linksEmpty = findViewById(R.id.links_empty)
         footnote = findViewById(R.id.footnote)
+
+        // On a tablet the content column would otherwise stretch a single-line
+        // text field past 2500 px. Cap it at a comfortable reading width and
+        // leave the rest of the window as plain surface.
+        val content = findViewById<LinearLayout>(R.id.content)
+        content.post {
+            val maxPx = (840 * resources.displayMetrics.density).toInt()
+            if (content.width > maxPx) {
+                content.layoutParams = (content.layoutParams as ViewGroup.LayoutParams).apply {
+                    width = maxPx
+                }
+            }
+        }
 
         versionView.text = getString(R.string.version_line, BuildConfig.VERSION_NAME)
         loadSettings()
