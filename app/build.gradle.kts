@@ -1,3 +1,5 @@
+import java.io.File
+import java.util.Base64
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -20,6 +22,25 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        // A real, stable signing identity when the keystore secrets are present, so a
+        // release APK can be installed over the previous one. Without them the release
+        // build falls back to the debug key (still installable, different identity).
+        val keystoreB64: String? = System.getenv("KEYSTORE_BASE64")
+        if (!keystoreB64.isNullOrBlank()) {
+            create("release") {
+                val store = File(layout.buildDirectory.get().asFile, "twinlink-release.p12")
+                store.parentFile?.mkdirs()
+                store.writeBytes(Base64.getMimeDecoder().decode(keystoreB64))
+                storeFile = store
+                storeType = "pkcs12"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("KEY_ALIAS") ?: "twinlink"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: ""
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -27,6 +48,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
         }
     }
 
