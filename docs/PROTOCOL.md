@@ -97,6 +97,14 @@ a link into somebody's session, and it stops the relay being used without the se
 
 Clients re-send `HELLO` on every link every 30 s (keeps NAT mappings and DHCP-ish rebindings alive).
 
+**Addresses are per session, and clients must use theirs.** The relay allocates one address out of
+the pool per session and returns it in `HELLO_ACK.client_ip`; a DATA packet whose IPv4 source is not
+the session's own address is dropped and counted as `foreign_source`. That check is what keeps two
+devices apart: if both hardcode `10.99.0.2`, the second one's packets would be NATed as the first
+one's address and each would receive a share of the other's replies. Clients therefore take the TUN
+address from `HELLO_ACK` (a short pre-flight handshake before the interface is created), never from
+a constant.
+
 Session expiry on the relay: 90 s with no datagram from any link → drop the session and its TUN routes.
 A session holds at most 8 links. v1 relay serves any number of sessions from a pool
 `10.99.0.0/24` (`.1` = relay, clients from `.2` upward).

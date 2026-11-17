@@ -69,6 +69,25 @@ Docker: `relay/deploy/compose.yaml` (needs `NET_ADMIN`, `/dev/net/tun`, UDP 5182
 Client side: enter the relay host, port and the same secret in the app, then flip the switch and
 accept the Android VPN prompt.
 
+### This deployment
+
+| item | value |
+|---|---|
+| name | `relay.mojangle.net` (DNS-only CNAME to the apex, which the DDNS updater keeps on the WAN IP) |
+| transport | UDP 51821, forward created by the NAS itself over UPnP IGD |
+| relay host | container on the NAS, `NET_ADMIN` + `/dev/net/tun`, MASQUERADE out of `eth0` |
+| control API | `:51822` on the LAN only — never forwarded |
+| proof it works from outside | `.github/workflows/relay-probe.yml` runs the e2e client from a GitHub runner |
+
+Two details that are easy to get wrong:
+
+- A **CNAME to the apex**, not an A record with a literal IP. The WAN address is dynamic and
+  `cloudflare-ddns` maintains the apex; a pinned A record would silently rot on the next reconnect.
+- Most consumer routers only allow a UPnP port mapping **for the device that asks**. Asking from a
+  laptop for a mapping to the NAS fails with `718 ConflictInMappingEntry` on the same external port
+  that succeeds when requested from the NAS, so the mapping is created by a one-shot container with
+  `network_mode: host` running on the NAS itself.
+
 ## Verifying a relay
 
 `tools/e2e` speaks the protocol without a TUN device, so a relay can be tested from any machine:

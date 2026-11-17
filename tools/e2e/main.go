@@ -182,12 +182,13 @@ func splitLabels(name string) []string {
 // ---- link ------------------------------------------------------------------
 
 type link struct {
-	id   byte
-	name string
-	conn *net.UDPConn
-	relay *net.UDPAddr
-	tx   int64
-	rx   int64
+	id       byte
+	name     string
+	conn     *net.UDPConn
+	relay    *net.UDPAddr
+	assigned string // client IP the relay allocated for this session
+	tx       int64
+	rx       int64
 }
 
 func newLink(name string, id byte, relay *net.UDPAddr) (*link, error) {
@@ -221,6 +222,12 @@ func (l *link) hello(session uint16, secret string) error {
 	}
 	switch p.typ {
 	case tHelloAck:
+		var ack struct {
+			ClientIP string `json:"client_ip"`
+		}
+		if json.Unmarshal(p.payload, &ack) == nil && ack.ClientIP != "" {
+			l.assigned = ack.ClientIP
+		}
 		return nil
 	case tBye:
 		return fmt.Errorf("relay refused session: %s", string(p.payload))
@@ -311,7 +318,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "link %d HELLO failed: %v\n", i, err)
 			os.Exit(1)
 		}
-		fmt.Printf("link %d registered via %s\n", i, l.conn.LocalAddr())
+		fmt.Printf("link %d registered via %s (relay assigned %s)\n", i, l.conn.LocalAddr(), l.assigned)
 		ls = append(ls, l)
 	}
 
@@ -323,6 +330,12 @@ func main() {
 	}
 
 	// --- phase 1: ICMP echo through the tunnel
+	// Packets must carry the address the relay assigned to THIS session; a hardcoded
+	// 10.99.0.2 collides as soon as a second client holds the relay at the same time.
+	srcIP := ls[0].assigned
+	if srcIP == "" {
+		srcIP = clientIP
+	}
 	var seqNo uint32 // one contiguous DATA sequence space across both phases
 	icmpID := uint16(time.Now().UnixNano())
 	icmpSent := map[uint16]bool{}
@@ -333,7 +346,7 @@ func main() {
 		for j := range payload {
 			payload[j] = byte(j)
 		}
-		pkt := ipv4Packet(1, clientIP, "1.1.1.1", icmpEcho(icmpID, seq, payload))
+		pkt := ipv4Packet(1, srcIP, "1.1.1.1", icmpEcho(icmpID, seq, payload))
 		ls[i%len(ls)].send(tData, session, uint32(i), pkt)
 		seqNo++
 	}
@@ -363,7 +376,7 @@ func main() {
 		pending = append(pending, txid)
 		q := dnsQuery(txid, names[i%len(names)], 1)
 		sport := uint16(40000 + i%1000)
-		pkt := ipv4Packet(17, clientIP, "1.1.1.1", udpSeg(sport, 53, q))
+		pkt := ipv4Packet(17, srcIP, "1.1.1.1", udpSeg(sport, 53, q))
 		ls[i%len(ls)].send(tData, session, seqNo, pkt)
 		seqNo++
 		if i%10 == 9 {

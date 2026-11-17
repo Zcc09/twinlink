@@ -3,6 +3,7 @@
 package relay
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -421,6 +422,16 @@ func (e *Engine) handleData(l *link, h proto.Header, payload []byte) {
 	if !proto.IsIPv4(payload) {
 		e.counters.BadPayload.Add(1)
 		return
+	}
+	// Session isolation. Every session owns one address out of the pool; a packet claiming a
+	// different source would be NATed as that address and its replies returned to whichever
+	// session holds it. That is what happens when two clients both think they are 10.99.0.2,
+	// so drop it loudly instead of quietly hijacking the other session's return traffic.
+	if s.clientIP != nil {
+		if want := s.clientIP.To4(); want != nil && !bytes.Equal(payload[12:16], want) {
+			e.counters.ForeignSource.Add(1)
+			return
+		}
 	}
 	e.counters.DataIn.Add(1)
 	l.rxBytes.Add(uint64(len(payload)))

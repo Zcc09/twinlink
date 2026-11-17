@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.VpnService
+import java.net.InetAddress
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.system.ErrnoException
@@ -70,6 +71,24 @@ class TwinlinkVpnService : VpnService() {
         return START_STICKY
     }
 
+    /**
+     * Resolves a relay hostname on a worker thread. Waiting on a FutureTask with a timeout keeps
+     * the service's main thread off the network without needing a callback dance, and an IP
+     * literal (the usual LAN case) still parses instantly.
+     */
+    private fun resolveOffMainThread(host: String): InetAddress? {
+        val task = java.util.concurrent.FutureTask { InetAddress.getByName(host) }
+        val worker = Thread(task, "tl-resolve")
+        worker.isDaemon = true
+        worker.start()
+        return try {
+            task.get(5, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            Log.w(TAG, "relay host does not resolve: $host", e)
+            null
+        }
+    }
+
     private fun startTunnel(host: String, port: Int, secret: String) {
         val session = TwinlinkEngine.newSession()
         val currentStats = TwinlinkStats()
@@ -80,9 +99,45 @@ class TwinlinkVpnService : VpnService() {
         TunnelBus.serviceRunning = true
         notifyForeground()
 
+        // DNS must not run on the main thread (the service's callback thread), and its
+        // failure mode is silent: no address -> no links -> "waiting for the relay".
+        val relayIp = resolveOffMainThread(host)
+
+        // Sockets first, so the relay can tell us which client address this session owns
+        // before the interface is built with it.
+        val linkStats = currentStats
+        val manager = LinkManager(
+            context = this,
+            host = host,
+            relayAddressArg = relayIp,
+            port = port,
+            protectSocket = { socket: DatagramSocket -> protect(socket) },
+            onChanged = { links ->
+                for (endpoint in links) linkStats.link(endpoint.linkId, endpoint.label, endpoint.interfaceName)
+            }
+        )
+        manager.start()
+        linkManager = manager
+
+        // The pre-flight writes and reads a socket, so it belongs on a worker thread for the
+        // same reason the DNS lookup above does.
+        val preflight = java.util.concurrent.FutureTask {
+            manager.endpoints().firstOrNull()?.let {
+                TwinlinkEngine.preflightAddress(it, session, secret, Build.MODEL ?: "android")
+            }
+        }
+        Thread(preflight, "tl-preflight").apply { isDaemon = true }.start()
+        val assigned = try {
+            preflight.get(4, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            Log.w(TAG, "preflight failed", e)
+            null
+        }
+        if (assigned != null) Log.i(TAG, "relay assigned $assigned for session ${session.toString(16)}")
+
         val builder = Builder()
             .setSession("Twinlink")
-            .addAddress(Proto.CLIENT_IP, 24)
+            .addAddress(assigned ?: Proto.CLIENT_IP, 24)
             .addRoute("0.0.0.0", 0)
             .addDnsServer(Proto.DNS)
             .setMtu(Proto.MTU)
@@ -106,19 +161,6 @@ class TwinlinkVpnService : VpnService() {
             return
         }
         tunFd = fd
-
-        val linkStats = currentStats
-        val manager = LinkManager(
-            context = this,
-            host = host,
-            port = port,
-            protectSocket = { socket: DatagramSocket -> protect(socket) },
-            onChanged = { links ->
-                for (endpoint in links) linkStats.link(endpoint.linkId, endpoint.label, endpoint.interfaceName)
-            }
-        )
-        manager.start()
-        linkManager = manager
 
         val tunnel = FdTun(fd)
         tunIo = tunnel

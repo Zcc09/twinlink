@@ -357,6 +357,42 @@ class TwinlinkEngine(
     }
 
     companion object {
+        /**
+         * Sends one HELLO on [link] and returns the client address the relay assigned to this
+         * session, or null when nothing came back.
+         *
+         * The tunnel interface needs that address *before* it is built, and the relay hands the
+         * same session a different address when another session already holds the default one.
+         * Skipping this makes a second device silently unusable: its packets carry somebody
+         * else's source address and the relay drops them.
+         */
+        fun preflightAddress(
+            link: LinkEndpoint,
+            session: Int,
+            secret: String,
+            name: String?,
+            timeoutMs: Int = 2500
+        ): String? {
+            val ts = System.currentTimeMillis() / 1000L
+            val payload = ControlJson.hello(ts, Proof.hmacProof(secret, session, ts), Proto.MTU, name)
+            val datagram = ByteArray(Proto.HEADER_LEN + payload.size)
+            Header(Proto.TYPE_HELLO, Proto.FLAG_AUTH, session, 0, payload.size, link.linkId)
+                .encodeInto(datagram, 0)
+            System.arraycopy(payload, 0, datagram, Proto.HEADER_LEN, payload.size)
+            if (!link.send(datagram, datagram.size)) return null
+
+            val buf = ByteArray(2048)
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (System.currentTimeMillis() < deadline) {
+                val n = link.receive(buf, 250)
+                if (n < Proto.HEADER_LEN) continue
+                val header = Header.decode(buf, 0, n) ?: continue
+                if (header.type != Proto.TYPE_HELLO_ACK) continue
+                return ControlJson.parseHelloAck(buf, Proto.HEADER_LEN, n - Proto.HEADER_LEN)?.clientIp
+            }
+            return null
+        }
+
         fun newSession(): Int {
             val session = kotlin.random.Random.nextInt(1, 0x10000)
             return session

@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 class LinkManager(
     context: Context,
     private val host: String,
+    relayAddressArg: InetAddress?,
     private val port: Int,
     private val protectSocket: ((DatagramSocket) -> Boolean)? = null,
     private val onChanged: (List<LinkEndpoint>) -> Unit = {}
@@ -30,12 +31,14 @@ class LinkManager(
     private val cm = context.getSystemService(ConnectivityManager::class.java)
     private val links = ConcurrentHashMap<Int, Link>()
 
-    private val relayAddress: InetAddress? = try {
-        InetAddress.getByName(host)
-    } catch (e: Exception) {
-        Log.w(TAG, "relay host does not resolve: $host", e)
-        null
-    }
+    /**
+     * Resolved by the caller off the main thread. Resolving a *hostname* here is what
+     * throws NetworkOnMainThreadException inside a service (an IP literal parses without a
+     * lookup, which is why this only surfaced once the relay got a domain name), and the
+     * consequence is silent: no relay address means no links, so the tunnel sits on
+     * "waiting for the relay" forever.
+     */
+    private val relayAddress: InetAddress? = relayAddressArg
 
     @Volatile
     private var defaultNetwork: Network? = null

@@ -145,6 +145,45 @@ func TestRelayEndToEndBonding(t *testing.T) {
 // TestBadPayloadAndDuplicateData covers the relay's two cheap filters on the
 // inbound path: a DATA payload that is not IPv4 is dropped (counted as
 // bad_payload), and a repeated sequence number is dropped by the reorder buffer.
+// TestForeignSourceDataDropped covers session isolation: a DATA packet that claims a client
+// address the session does not own must never reach the TUN. Without this check two clients
+// that both believe they are 10.99.0.2 would each receive a share of the other's replies.
+func TestForeignSourceDataDropped(t *testing.T) {
+	r := newRig(t, []simSpec{{RateBps: 20e6, RTT: 20 * time.Millisecond}}, 0, 1)
+	defer r.close()
+
+	conn := r.client.socks[0]
+	send := func(seq uint32, payload []byte) {
+		d := proto.Datagram(proto.Header{Type: proto.TypeData, Session: r.client.sess, Seq: seq, LinkID: 0}, payload)
+		if _, err := conn.Write(d); err != nil {
+			t.Fatalf("write DATA: %v", err)
+		}
+	}
+
+	foreign := makeUploadPacket(11)
+	copy(foreign[12:16], net.IPv4(10, 99, 0, 99).To4())
+	send(0, foreign)
+	time.Sleep(80 * time.Millisecond)
+
+	st := r.engine.Stats().Counters
+	if st.ForeignSource != 1 {
+		t.Errorf("foreign_source = %d, want 1", st.ForeignSource)
+	}
+	if st.DataIn != 0 {
+		t.Errorf("data_in = %d, want 0 (a foreign source is not accepted data)", st.DataIn)
+	}
+	if n := len(r.tun.out); n != 0 {
+		t.Errorf("tunnel received %d packets, want 0", n)
+	}
+
+	// The session's own address still works right after the rejection.
+	send(1, makeUploadPacket(12))
+	got := collectUploaded(t, r.tun, 1, 2*time.Second)
+	if len(got) != 1 || got[0] != 12 {
+		t.Fatalf("tunnel saw %v, want [12]", got)
+	}
+}
+
 func TestBadPayloadAndDuplicateData(t *testing.T) {
 	r := newRig(t, []simSpec{{RateBps: 20e6, RTT: 20 * time.Millisecond}}, 0, 1)
 	defer r.close()

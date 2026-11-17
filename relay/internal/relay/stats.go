@@ -24,6 +24,7 @@ type Counters struct {
 	Dropped       atomic.Uint64
 	NoRoute       atomic.Uint64
 	LinksRejected atomic.Uint64
+	ForeignSource atomic.Uint64 // DATA dropped: source address not owned by that session
 	SessionsOpen  atomic.Uint64
 	SessionsTotal atomic.Uint64
 	TunReadErrors atomic.Uint64
@@ -48,6 +49,7 @@ type CounterSnapshot struct {
 	Dropped       uint64 `json:"dropped"`
 	NoRoute       uint64 `json:"no_route"`
 	LinksRejected uint64 `json:"links_rejected"`
+	ForeignSource uint64 `json:"foreign_source"`
 	SessionsTotal uint64 `json:"sessions_total"`
 	TunReadErrors uint64 `json:"tun_read_errors"`
 	WriteErrors   uint64 `json:"write_errors"`
@@ -72,6 +74,7 @@ func (c *Counters) Snapshot() CounterSnapshot {
 		Dropped:       c.Dropped.Load(),
 		NoRoute:       c.NoRoute.Load(),
 		LinksRejected: c.LinksRejected.Load(),
+		ForeignSource: c.ForeignSource.Load(),
 		SessionsTotal: c.SessionsTotal.Load(),
 		TunReadErrors: c.TunReadErrors.Load(),
 		WriteErrors:   c.WriteErrors.Load(),
