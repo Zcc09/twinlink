@@ -1,0 +1,41 @@
+name: relay-probe
+
+# Proves the Twinlink relay is reachable from OUTSIDE the home network.
+# A GitHub runner is a genuinely external host, so this is the only honest way to
+# test an inbound UDP port without standing next to the router.
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: relay hostname or IP
+        required: true
+        default: relay.mojangle.net
+      port:
+        description: relay UDP port
+        required: true
+        default: "51821"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.x"
+
+      - name: resolve the relay name
+        run: getent ahostsv4 "${{ inputs.host }}" || true
+
+      - name: register two links and push real internet traffic through the tunnel
+        env:
+          SECRET: ${{ secrets.TWINLINK_SECRET }}
+        run: |
+          set -o pipefail
+          cd tools/e2e
+          go build -o e2e .
+          ./e2e --host "${{ inputs.host }}" --port "${{ inputs.port }}" \
+                --secret "$SECRET" --links 2 --icmp 8 --dns 20 | tee probe.log
+          grep -q "^PASS" probe.log
